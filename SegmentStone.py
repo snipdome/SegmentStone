@@ -168,7 +168,7 @@ class SegmentStoneWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 		uiWidget = slicer.util.loadUI(self.resourcePath("UI/SegmentStone.ui"))
 		self.layout.addWidget(uiWidget)
 		self.ui = slicer.util.childWidgetVariables(uiWidget)
-		
+
 		# hide the debug level slider
 		self.ui.debugLevelSliderWidget.hide()
 		self.ui.debugLevelLabel.hide()
@@ -523,7 +523,7 @@ def find_minimal_bounding_box(volume, z_stone_center, stone_value, debug_level=D
 	return np.array([x_min, x_max, y_min, y_max, z_min, z_max], dtype=int)
 
 
-def find_glue(volume, stone_value, lims, h, debug_level=DebugLevel.NO_VERBOSE.value):
+def find_glue(volume, stone_value, lims, h, debug_level=DebugLevel.NO_VERBOSE.value, dcm_convention=True):
 	# The glue is below the stone and usually is darker than the stone
 	# The following code will start looking for glue above the stone
 	# and will detect the glue based on the its intensity.
@@ -531,10 +531,10 @@ def find_glue(volume, stone_value, lims, h, debug_level=DebugLevel.NO_VERBOSE.va
 	glue_pos = None
 	is_glue_below = None
 
-	for _, looking_below in enumerate([False, True]):
+	for _, looking_below in enumerate([True, False]):
 		if is_glue_below is None:
 			logging.info(f"Looking below: {looking_below}") if debug_level>=DebugLevel.TEXT_VERBOSE.value else None
-			if looking_below:
+			if looking_below ^ (not dcm_convention): # if the image is in DCM convention, the z axis is inverted
 				h_clipped = min(h, volume.shape[2]-lims[5])
 				bool_vol = volume[lims[0]:lims[1], lims[2]:lims[3], lims[5]:lims[5]+h_clipped] > stone_value*0.2
 				new_vol = np.where(bool_vol, volume[lims[0]:lims[1], lims[2]:lims[3], lims[5]:lims[5]+h_clipped], 0)
@@ -563,13 +563,14 @@ def find_glue(volume, stone_value, lims, h, debug_level=DebugLevel.NO_VERBOSE.va
 				#x_glue = volume.shape[0]-x_glue
 				y_glue = occurrences_x[occurrences_x.shape[0]//2]#+lims[2]
 				#y_glue = volume.shape[1]-y_glue
-				z_glue = (lims[5] + h_clipped//2) if looking_below else (lims[4] - h_clipped//2)
+				z_glue = (lims[5] + h_clipped//2) if looking_below^(not dcm_convention) else (lims[4] - h_clipped//2)
 
 				glue_pos = np.array([x_glue, y_glue, z_glue], dtype=int)
 				glue_value = np.median(new_vol[bool_vol])
 				is_glue_below = looking_below
 				logging.info(f"Glue detected")
 				logging.info(f"Glue at position: {glue_pos}") if debug_level>=DebugLevel.TEXT_VERBOSE.value else None
+				logging.info(f'dcm_convention: {dcm_convention}') if debug_level>=DebugLevel.TEXT_VERBOSE.value else None
 			else:
 				logging.info("Glue not detected")
 				glue_value = None
@@ -716,7 +717,7 @@ def apply_curvature_flow(image, dataset_path=None, result=None, debug_level=Debu
 	else:
 		result[0] = sitk_to_vtk(smoothed_sitk_image, extent, dirs)
 
-def create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, lims, glue_pos, h, seed_radius=10, is_glue_below=True, debug_level=DebugLevel.NO_VERBOSE.value):
+def create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, lims, glue_pos, h, seed_radius=10, is_glue_below=True, debug_level=DebugLevel.NO_VERBOSE.value, dcm_convention=True):
 	segmentationNode = slicer.vtkMRMLSegmentationNode()
 	segmentationNode.SetName("Initial seed")
 	if debug_level>=DebugLevel.SHOW_INTERM_SEGMS.value:
@@ -770,7 +771,7 @@ def create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, lims, 
 	if glue_pos is not None:
 		glue_seed = vtk.vtkSphereSource()
 		glue_seed.SetCenter(origin[0]+dirs.GetElement(0, 0)*glue_pos[0], origin[1]+dirs.GetElement(1, 1)*glue_pos[1], origin[2]+dirs.GetElement(2, 2)*glue_pos[2])
-		l1 = abs(glue_pos[2]-lims[5]) if is_glue_below else abs(glue_pos[2]-lims[4])
+		l1 = abs(glue_pos[2]-lims[5]) if is_glue_below^(not dcm_convention) else abs(glue_pos[2]-lims[4])
 		if seed_radius<l1:
 			glue_seed.SetRadius(seed_radius*max_vox_size)
 		else:
@@ -1124,6 +1125,12 @@ def segmentation_kernel(**kwargs):
 	masterVolumeNode = slicer.mrmlScene.GetNodeByID(kwargs['inputVolume'])
 	outputSegmentationNode = slicer.mrmlScene.GetNodeByID(kwargs['outputLabelMap'])
 
+	# Check the orientation of the volume to know if the z axis is inverted.
+	orientation = vtk.vtkMatrix4x4()
+	masterVolumeNode.GetIJKToRASMatrix(orientation)
+	dcm_convention = (orientation.GetElement(2, 2) < 0) 
+	del orientation
+
 	"""
 		Parameters
 	"""
@@ -1176,7 +1183,7 @@ def segmentation_kernel(**kwargs):
 	timings["Find minimal bounding box"] += time.time()
 
 	timings["Find glue"] = -time.time()
-	glue_value, glue_pos, is_glue_below = find_glue(volume, stone_value, stone_lims, glue_h, debug_level=debug_level)
+	glue_value, glue_pos, is_glue_below = find_glue(volume, stone_value, stone_lims, glue_h, debug_level=debug_level, dcm_convention=dcm_convention)
 	timings["Find glue"] += time.time()
 	logging.info(f"Glue gray value: {glue_value + min_volume}") if (debug_level>=DebugLevel.TEXT_VERBOSE.value and glue_value is not None) else None
 
@@ -1193,7 +1200,7 @@ def segmentation_kernel(**kwargs):
 	del volume
 
 	timings["Create seed"] = -time.time()
-	segmentationNode = create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, stone_lims, glue_pos, glue_h, seed_radius=seed_radius, is_glue_below=is_glue_below, debug_level=debug_level)
+	segmentationNode = create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, stone_lims, glue_pos, glue_h, seed_radius=seed_radius, is_glue_below=is_glue_below, debug_level=debug_level, dcm_convention=dcm_convention)
 	timings["Create seed"] += time.time()
 
 	masterImageData, mergedImage, mergedLabelmapGeometryImage, _ = infer_minimal_label_extent(masterVolumeNode, segmentationNode, debug_level=debug_level)
