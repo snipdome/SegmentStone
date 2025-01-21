@@ -1125,6 +1125,8 @@ def segmentation_kernel(**kwargs):
 	masterVolumeNode = slicer.mrmlScene.GetNodeByID(kwargs['inputVolume'])
 	outputSegmentationNode = slicer.mrmlScene.GetNodeByID(kwargs['outputLabelMap'])
 
+
+
 	# Check the orientation of the volume to know if the z axis is inverted.
 	orientation = vtk.vtkMatrix4x4()
 	masterVolumeNode.GetIJKToRASMatrix(orientation)
@@ -1269,6 +1271,14 @@ def segmentation_kernel(**kwargs):
 		updateSegmentationNode(outputSegmentationNode, fastgrowcutted, mergedLabelmapGeometryImage, objects_in_scene, [colours[o] for o in objects_in_scene])
 
 	timings["Total"] += time.time()
+
+
+	# Set the output volume path
+	inputVolumePath = masterVolumeNode.GetStorageNode().GetFileName()
+	path = os.path.dirname(inputVolumePath)
+	outputStorageNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLVolumeArchetypeStorageNode")
+	outputVolumePath = os.path.join(path, "output.nrrd")
+	outputStorageNode.SetFileName(outputVolumePath)
 
 
 	# print timing
