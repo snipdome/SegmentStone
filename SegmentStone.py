@@ -56,7 +56,7 @@ class SegmentStone(ScriptedLoadableModule):
 	def __init__(self, parent):
 		ScriptedLoadableModule.__init__(self, parent)
 		self.parent.title = _("SegmentStone")  
-		self.parent.categories = [translate("qSlicerAbstractCoreModule", "Segmentation")]
+		self.parent.categories = [translate("qSlicerAbstractCoreModule", "Post-Process")]
 		self.parent.dependencies = []
 		self.parent.contributors = ["Domenico Iuso (imec-Visionlab, UAntwerp)"] 
 		self.parent.helpText = _("""
@@ -1276,9 +1276,10 @@ def segmentation_kernel(**kwargs):
 	# Set the output volume path
 	inputVolumePath = masterVolumeNode.GetStorageNode().GetFileName()
 	path = os.path.dirname(inputVolumePath)
-	outputStorageNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLVolumeArchetypeStorageNode")
-	outputVolumePath = os.path.join(path, "output.nrrd")
-	outputStorageNode.SetFileName(outputVolumePath)
+	outputVolumePath = os.path.join(path, "labelmap.nrrd")
+	outputSegmentationNode.AddDefaultStorageNode()
+	outputSegmentationNode.GetStorageNode().SetFileName(outputVolumePath)
+
 
 
 	# print timing
