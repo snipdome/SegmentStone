@@ -727,7 +727,6 @@ def create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, lims, 
 	dirs = vtk.vtkMatrix4x4()
 	masterVolumeNode.GetIJKToRASMatrix(dirs)
 	voxel_size = masterVolumeNode.GetSpacing()
-	logging.error(f"Voxel size: {voxel_size}") ############## FIXME
 	max_vox_size = max(voxel_size)
 	origin = masterVolumeNode.GetOrigin()
 
