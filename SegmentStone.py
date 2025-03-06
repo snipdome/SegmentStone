@@ -727,6 +727,7 @@ def create_initial_seed_segmentation(masterVolumeNode, stone_seed_points, lims, 
 	dirs = vtk.vtkMatrix4x4()
 	masterVolumeNode.GetIJKToRASMatrix(dirs)
 	voxel_size = masterVolumeNode.GetSpacing()
+	logging.error(f"Voxel size: {voxel_size}") ############## FIXME
 	max_vox_size = max(voxel_size)
 	origin = masterVolumeNode.GetOrigin()
 
@@ -1117,7 +1118,7 @@ def MeasureStats(node):
 		volume_mm3 = stats[segmentId,"LabelmapSegmentStatisticsPlugin.volume_mm3"]
 		segmentName = node.GetSegmentation().GetSegment(segmentId).GetName()
 		#print(f"{segmentName} volume = {volume_mm3} mm3")
-		logging.info(f"This stone has {volume_mm3*0.01757625:.2f} Ct\n\n")
+		logging.info(f"{volume_mm3*0.01757625:.2f} Ct, stone weight\n\n")
 		
 
 def segmentation_kernel(**kwargs):
