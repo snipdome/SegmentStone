@@ -1117,7 +1117,7 @@ def MeasureStats(node):
 		volume_mm3 = stats[segmentId,"LabelmapSegmentStatisticsPlugin.volume_mm3"]
 		segmentName = node.GetSegmentation().GetSegment(segmentId).GetName()
 		#print(f"{segmentName} volume = {volume_mm3} mm3")
-		logging.info(f"This stone has {volume_mm3*0.01757625:.2f} Ct\n\n")
+		logging.info(f"{volume_mm3*0.01757625:.2f} Ct, stone weight\n\n")
 		
 
 def segmentation_kernel(**kwargs):
